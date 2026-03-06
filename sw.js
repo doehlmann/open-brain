@@ -1,5 +1,5 @@
 const CACHE_NAME = 'open-brain-voice-v1';
-const ASSETS = ['/', '/index.html', '/manifest.json'];
+const ASSETS = ['/open-brain/', '/open-brain/index.html', '/open-brain/manifest.json'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(

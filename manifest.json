@@ -2,7 +2,7 @@
   "name": "Open Brain Voice",
   "short_name": "Open Brain",
   "description": "Voice capture for Open Brain",
-  "start_url": "/",
+  "start_url": "/open-brain/",
   "display": "standalone",
   "background_color": "#0a0a0a",
   "theme_color": "#0a0a0a",
