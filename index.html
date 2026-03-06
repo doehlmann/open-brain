@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Open Brain">
+  <meta name="theme-color" content="#0a0a0a">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="manifest" href="manifest.json">
+  <title>Open Brain Voice</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    :root {
+      --bg: #0a0a0a;
+      --surface: #1a1a1a;
+      --border: #2a2a2a;
+      --text: #e0e0e0;
+      --text-dim: #888;
+      --accent: #4a9eff;
+      --accent-glow: rgba(74, 158, 255, 0.3);
+      --success: #34d399;
+      --error: #f87171;
+      --safe-top: env(safe-area-inset-top, 20px);
+      --safe-bottom: env(safe-area-inset-bottom, 20px);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100dvh;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* --- NAV --- */
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: calc(var(--safe-top) + 8px) 20px 8px;
+      position: relative;
+      z-index: 10;
+    }
+    .nav-title {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+    }
+    .nav-btn {
+      background: none;
+      border: none;
+      color: var(--accent);
+      font-size: 15px;
+      padding: 8px;
+      cursor: pointer;
+    }
+
+    /* --- PAGES --- */
+    .page { display: none; height: calc(100dvh - 60px - var(--safe-top)); flex-direction: column; }
+    .page.active { display: flex; }
+
+    /* --- CAPTURE PAGE --- */
+    .capture-page {
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      gap: 30px;
+    }
+
+    .status-text {
+      font-size: 15px;
+      color: var(--text-dim);
+      height: 20px;
+      transition: all 0.3s;
+    }
+    .status-text.recording { color: var(--accent); }
+    .status-text.success { color: var(--success); }
+    .status-text.error { color: var(--error); }
+
+    /* Record button */
+    .record-btn-wrap {
+      position: relative;
+      width: 160px;
+      height: 160px;
+    }
+    .record-pulse {
+      position: absolute;
+      inset: -20px;
+      border-radius: 50%;
+      border: 2px solid var(--accent);
+      opacity: 0;
+      transition: all 0.3s;
+    }
+    .recording .record-pulse {
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.9); opacity: 0.6; }
+      50% { transform: scale(1.1); opacity: 0; }
+      100% { transform: scale(0.9); opacity: 0; }
+    }
+    .record-btn {
+      width: 160px;
+      height: 160px;
+      border-radius: 50%;
+      border: 3px solid var(--accent);
+      background: var(--surface);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      position: relative;
+      z-index: 1;
+    }
+    .record-btn:active { transform: scale(0.95); }
+    .recording .record-btn {
+      background: var(--accent);
+      border-color: var(--accent);
+      box-shadow: 0 0 40px var(--accent-glow);
+    }
+    .record-icon {
+      width: 40px;
+      height: 40px;
+      transition: all 0.2s;
+    }
+    .recording .record-icon { fill: white; }
+    .record-icon { fill: var(--accent); }
+    .recording .mic-path { display: none; }
+    .recording .stop-rect { display: block; }
+    .stop-rect { display: none; }
+
+    /* Transcript area */
+    .transcript-area {
+      width: 100%;
+      max-width: 400px;
+      min-height: 120px;
+      max-height: 200px;
+      flex-shrink: 0;
+    }
+    .transcript-box {
+      width: 100%;
+      min-height: 100px;
+      max-height: 180px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      color: var(--text);
+      font-size: 16px;
+      line-height: 1.5;
+      resize: none;
+      outline: none;
+      font-family: inherit;
+      overflow-y: auto;
+    }
+    .transcript-box:empty::before {
+      content: 'Your words will appear here...';
+      color: var(--text-dim);
+    }
+    .transcript-box:focus { border-color: var(--accent); }
+
+    /* Action buttons */
+    .action-row {
+      display: flex;
+      gap: 12px;
+      width: 100%;
+      max-width: 400px;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.3s;
+      pointer-events: none;
+    }
+    .action-row.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    .btn {
+      flex: 1;
+      padding: 14px;
+      border-radius: 12px;
+      border: none;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-send {
+      background: var(--accent);
+      color: white;
+    }
+    .btn-clear {
+      background: var(--surface);
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+    }
+
+    /* --- HISTORY PAGE --- */
+    .history-page {
+      padding: 0 20px calc(var(--safe-bottom) + 20px);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .history-empty {
+      text-align: center;
+      color: var(--text-dim);
+      padding-top: 60px;
+      font-size: 15px;
+    }
+    .history-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+    .history-text {
+      font-size: 15px;
+      line-height: 1.4;
+      margin-bottom: 8px;
+    }
+    .history-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+    .history-status {
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-weight: 500;
+    }
+    .history-status.sent { background: rgba(52, 211, 153, 0.15); color: var(--success); }
+    .history-status.failed { background: rgba(248, 113, 113, 0.15); color: var(--error); cursor: pointer; }
+    .history-status.queued { background: rgba(74, 158, 255, 0.15); color: var(--accent); }
+
+    /* --- SETTINGS PAGE --- */
+    .settings-page {
+      padding: 20px;
+      gap: 16px;
+      overflow-y: auto;
+    }
+    .setting-group {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .setting-label {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .setting-input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      color: var(--text);
+      font-size: 15px;
+      outline: none;
+      font-family: monospace;
+    }
+    .setting-input:focus { border-color: var(--accent); }
+    .setting-note {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: 8px;
+      line-height: 1.4;
+    }
+    .setting-toggle {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .toggle-label { font-size: 15px; }
+    .toggle {
+      width: 50px;
+      height: 30px;
+      background: var(--border);
+      border-radius: 15px;
+      border: none;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle.on { background: var(--accent); }
+    .toggle::after {
+      content: '';
+      position: absolute;
+      width: 26px;
+      height: 26px;
+      background: white;
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      transition: transform 0.2s;
+    }
+    .toggle.on::after { transform: translateX(20px); }
+
+    .btn-save-settings {
+      width: 100%;
+      padding: 14px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav class="nav">
+    <button class="nav-btn" id="navLeft" onclick="showHistory()">History</button>
+    <span class="nav-title">Open Brain</span>
+    <button class="nav-btn" id="navRight" onclick="showSettings()">Settings</button>
+  </nav>
+
+  <!-- CAPTURE PAGE -->
+  <div id="capturePage" class="page capture-page active">
+    <div class="status-text" id="statusText">Tap to capture a thought</div>
+
+    <div class="record-btn-wrap" id="recordWrap">
+      <div class="record-pulse"></div>
+      <button class="record-btn" id="recordBtn" onclick="toggleRecording()">
+        <svg class="record-icon" viewBox="0 0 24 24">
+          <path class="mic-path" d="M12 1a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V5a4 4 0 0 0-4-4zm-1 17.93A7.006 7.006 0 0 1 5 12h2a5 5 0 0 0 10 0h2a7.006 7.006 0 0 1-6 6.93V21h3v2H8v-2h3v-2.07z"/>
+          <rect class="stop-rect" x="6" y="6" width="12" height="12" rx="2"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="transcript-area">
+      <div class="transcript-box" id="transcript" contenteditable="false"></div>
+    </div>
+
+    <div class="action-row" id="actionRow">
+      <button class="btn btn-clear" onclick="clearCapture()">Clear</button>
+      <button class="btn btn-send" onclick="sendCapture()">Capture</button>
+    </div>
+  </div>
+
+  <!-- HISTORY PAGE -->
+  <div id="historyPage" class="page history-page"></div>
+
+  <!-- SETTINGS PAGE -->
+  <div id="settingsPage" class="page settings-page">
+    <div class="setting-group">
+      <div class="setting-label">Supabase Function URL</div>
+      <input class="setting-input" id="settingUrl" type="url"
+        placeholder="https://your-project.supabase.co/functions/v1/ingest-thought">
+      <div class="setting-note">Your Open Brain ingest-thought edge function URL</div>
+    </div>
+
+    <div class="setting-group">
+      <div class="setting-label">API Key</div>
+      <input class="setting-input" id="settingKey" type="password"
+        placeholder="Your MCP access key">
+      <div class="setting-note">Stored locally on this device only</div>
+    </div>
+
+    <div class="setting-group">
+      <div class="setting-toggle">
+        <span class="toggle-label">Auto-send after recording</span>
+        <button class="toggle" id="toggleAutoSend" onclick="toggleAuto()"></button>
+      </div>
+      <div class="setting-note">When on, thoughts are sent immediately when you stop recording. When off, you can edit before sending.</div>
+    </div>
+
+    <button class="btn-save-settings" onclick="saveSettings()">Save Settings</button>
+  </div>
+
+  <script>
+    // --- State ---
+    let isRecording = false;
+    let recognition = null;
+    let finalTranscript = '';
+    let settings = loadSettings();
+    let history = JSON.parse(localStorage.getItem('ob_history') || '[]');
+
+    function loadSettings() {
+      return {
+        url: localStorage.getItem('ob_url') || 'https://ezkkhclalvdzqwodhypr.supabase.co/functions/v1/ingest-thought',
+        key: localStorage.getItem('ob_key') || '',
+        autoSend: localStorage.getItem('ob_auto') !== 'false'
+      };
+    }
+
+    // --- Navigation ---
+    function showPage(id, leftBtn, rightBtn) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      document.getElementById('navLeft').textContent = leftBtn.text;
+      document.getElementById('navLeft').onclick = leftBtn.action;
+      document.getElementById('navRight').textContent = rightBtn.text;
+      document.getElementById('navRight').onclick = rightBtn.action;
+    }
+
+    function showCapture() {
+      showPage('capturePage',
+        { text: 'History', action: showHistory },
+        { text: 'Settings', action: showSettings }
+      );
+    }
+
+    function showHistory() {
+      renderHistory();
+      showPage('historyPage',
+        { text: 'Back', action: showCapture },
+        { text: 'Clear All', action: clearHistory }
+      );
+    }
+
+    function showSettings() {
+      document.getElementById('settingUrl').value = settings.url;
+      document.getElementById('settingKey').value = settings.key;
+      const toggle = document.getElementById('toggleAutoSend');
+      toggle.classList.toggle('on', settings.autoSend);
+      showPage('settingsPage',
+        { text: 'Back', action: showCapture },
+        { text: '', action: () => {} }
+      );
+    }
+
+    // --- Speech Recognition ---
+    function initSpeech() {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) {
+        setStatus('Speech recognition not supported', 'error');
+        return null;
+      }
+      const r = new SR();
+      r.continuous = true;
+      r.interimResults = true;
+      r.lang = 'en-AU';
+
+      r.onresult = (e) => {
+        let interim = '';
+        finalTranscript = '';
+        for (let i = 0; i < e.results.length; i++) {
+          if (e.results[i].isFinal) {
+            finalTranscript += e.results[i][0].transcript;
+          } else {
+            interim += e.results[i][0].transcript;
+          }
+        }
+        document.getElementById('transcript').textContent = finalTranscript + interim;
+      };
+
+      r.onerror = (e) => {
+        if (e.error === 'no-speech') {
+          setStatus('No speech detected — try again', 'error');
+        } else if (e.error === 'not-allowed') {
+          setStatus('Microphone access denied — check Settings', 'error');
+        } else {
+          setStatus('Error: ' + e.error, 'error');
+        }
+        stopRecording();
+      };
+
+      r.onend = () => {
+        if (isRecording) {
+          // iOS Safari stops recognition after ~60s, restart it
+          try { r.start(); } catch(e) { stopRecording(); }
+          return;
+        }
+        const text = document.getElementById('transcript').textContent.trim();
+        if (text && settings.autoSend) {
+          sendCapture();
+        } else if (text) {
+          document.getElementById('transcript').contentEditable = 'true';
+          document.getElementById('actionRow').classList.add('visible');
+          setStatus('Edit or tap Capture to send', '');
+        }
+      };
+
+      return r;
+    }
+
+    function toggleRecording() {
+      if (isRecording) {
+        stopRecording();
+      } else {
+        startRecording();
+      }
+    }
+
+    function startRecording() {
+      if (!settings.key) {
+        setStatus('Set your API key in Settings first', 'error');
+        showSettings();
+        return;
+      }
+
+      finalTranscript = '';
+      document.getElementById('transcript').textContent = '';
+      document.getElementById('transcript').contentEditable = 'false';
+      document.getElementById('actionRow').classList.remove('visible');
+
+      recognition = initSpeech();
+      if (!recognition) return;
+
+      try {
+        recognition.start();
+        isRecording = true;
+        document.getElementById('recordWrap').classList.add('recording');
+        setStatus('Listening...', 'recording');
+      } catch (e) {
+        setStatus('Could not start recording', 'error');
+      }
+    }
+
+    function stopRecording() {
+      isRecording = false;
+      document.getElementById('recordWrap').classList.remove('recording');
+      if (recognition) {
+        try { recognition.stop(); } catch(e) {}
+      }
+    }
+
+    // --- Capture ---
+    async function sendCapture() {
+      const text = document.getElementById('transcript').textContent.trim();
+      if (!text) {
+        setStatus('Nothing to capture', 'error');
+        return;
+      }
+
+      setStatus('Sending...', 'recording');
+      document.getElementById('actionRow').classList.remove('visible');
+
+      const entry = {
+        content: text,
+        timestamp: new Date().toISOString(),
+        status: 'sending'
+      };
+
+      try {
+        const res = await fetch(settings.url, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + settings.key,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ content: text, source: 'voice-iphone' })
+        });
+
+        if (res.ok) {
+          entry.status = 'sent';
+          setStatus('Captured', 'success');
+          // Haptic feedback if available
+          if (navigator.vibrate) navigator.vibrate(50);
+          setTimeout(() => {
+            document.getElementById('transcript').textContent = '';
+            setStatus('Tap to capture a thought', '');
+          }, 1500);
+        } else {
+          throw new Error('HTTP ' + res.status);
+        }
+      } catch (e) {
+        entry.status = 'failed';
+        setStatus('Failed to send — saved locally', 'error');
+      }
+
+      history.unshift(entry);
+      if (history.length > 100) history = history.slice(0, 100);
+      localStorage.setItem('ob_history', JSON.stringify(history));
+    }
+
+    function clearCapture() {
+      document.getElementById('transcript').textContent = '';
+      document.getElementById('transcript').contentEditable = 'false';
+      document.getElementById('actionRow').classList.remove('visible');
+      setStatus('Tap to capture a thought', '');
+    }
+
+    // --- Retry failed ---
+    async function retryCapture(index) {
+      const entry = history[index];
+      if (!entry || entry.status !== 'failed') return;
+
+      entry.status = 'sending';
+      renderHistory();
+
+      try {
+        const res = await fetch(settings.url, {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + settings.key,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ content: entry.content, source: 'voice-iphone' })
+        });
+
+        entry.status = res.ok ? 'sent' : 'failed';
+      } catch (e) {
+        entry.status = 'failed';
+      }
+
+      localStorage.setItem('ob_history', JSON.stringify(history));
+      renderHistory();
+    }
+
+    // --- History ---
+    function renderHistory() {
+      const el = document.getElementById('historyPage');
+      if (history.length === 0) {
+        el.innerHTML = '<div class="history-empty">No captures yet</div>';
+        return;
+      }
+
+      el.innerHTML = history.map((h, i) => {
+        const date = new Date(h.timestamp);
+        const timeStr = date.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })
+          + ' ' + date.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+        const retryAttr = h.status === 'failed' ? `onclick="retryCapture(${i})"` : '';
+        const retryHint = h.status === 'failed' ? ' — tap to retry' : '';
+        return `
+          <div class="history-item">
+            <div class="history-text">${escapeHtml(h.content)}</div>
+            <div class="history-meta">
+              <span>${timeStr}</span>
+              <span class="history-status ${h.status}" ${retryAttr}>${h.status}${retryHint}</span>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function clearHistory() {
+      if (confirm('Clear all capture history?')) {
+        history = [];
+        localStorage.setItem('ob_history', '[]');
+        renderHistory();
+      }
+    }
+
+    // --- Settings ---
+    function toggleAuto() {
+      settings.autoSend = !settings.autoSend;
+      document.getElementById('toggleAutoSend').classList.toggle('on', settings.autoSend);
+    }
+
+    function saveSettings() {
+      settings.url = document.getElementById('settingUrl').value.trim();
+      settings.key = document.getElementById('settingKey').value.trim();
+      localStorage.setItem('ob_url', settings.url);
+      localStorage.setItem('ob_key', settings.key);
+      localStorage.setItem('ob_auto', settings.autoSend);
+      showCapture();
+      setStatus('Settings saved', 'success');
+      setTimeout(() => setStatus('Tap to capture a thought', ''), 1500);
+    }
+
+    // --- Helpers ---
+    function setStatus(text, cls) {
+      const el = document.getElementById('statusText');
+      el.textContent = text;
+      el.className = 'status-text' + (cls ? ' ' + cls : '');
+    }
+
+    function escapeHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    // --- Service Worker ---
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
